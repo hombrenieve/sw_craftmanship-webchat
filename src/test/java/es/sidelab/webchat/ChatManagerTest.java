@@ -2,9 +2,9 @@ package es.sidelab.webchat;
 
 import static org.junit.Assert.assertTrue;
 
+import java.util.ConcurrentModificationException;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import org.junit.Test;
 
@@ -30,7 +30,7 @@ public class ChatManagerTest {
 		});
 
 		// Crear un nuevo chat en el chatManager
-		chatManager.newChat("Chat2", 5, TimeUnit.SECONDS);
+		chatManager.newChat("Chat", 5, TimeUnit.SECONDS);
 
 		// Comprobar que el chat recibido en el método 'newChat' se llama 'Chat'
 		assertTrue("The method 'newChat' should be invoked with 'Chat', but the value is "
@@ -64,5 +64,45 @@ public class ChatManagerTest {
 		assertTrue("Notified new user '" + newUser[0] + "' is not equal than user name 'user2'",
 				"user2".equals(newUser[0]));
 
+	}
+
+	@Test
+	public void concurrentUsersInChat() {
+		final int numUsers = 4;
+		final int numIterations = 5;
+		final ChatManager manager = new ChatManager(50);
+
+		Callable<Boolean> concurrentUserActions = () -> {
+				TestUser user = new TestUser("user "+Thread.currentThread().getName());
+				manager.newUser(user);
+
+				for(int i = 0; i < numIterations; i++) {
+					Chat chat = manager.newChat("chat"+i, 5, TimeUnit.SECONDS);
+					chat.addUser(user);
+					System.out.println("Users in chat: "+chat.getUsers());
+				}
+
+				return true;
+		};
+
+		ExecutorService executor = Executors.newFixedThreadPool(numUsers);
+		CompletionService<Boolean> service = new ExecutorCompletionService<>(executor);
+
+		for(int i = 0; i < numUsers; i++) {
+			service.submit(concurrentUserActions);
+		}
+
+		for(int i = 0; i < numUsers; i++) {
+			try {
+				Future<Boolean> f = service.take();
+				assertTrue("Task failed", f.get().booleanValue());
+			}
+			catch (ExecutionException ee) {
+				throw new ConcurrentModificationException(ee.getCause());
+			}
+			catch (InterruptedException ie) {
+				System.err.println("Another error has happened");
+			}
+		}
 	}
 }
