@@ -17,7 +17,7 @@ public class ChatManager {
 
 	public void newUser(User user) {
 
-		User oldUser = users.putIfAbsent(user.getName(), user);
+		User oldUser = users.putIfAbsent(user.getName(), new QueuedUser(user));
 		if(oldUser != null){
 			throw new IllegalArgumentException("There is already a user with name \'"
 					+ user.getName() + "\'");

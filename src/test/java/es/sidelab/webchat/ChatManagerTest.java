@@ -79,7 +79,11 @@ public class ChatManagerTest {
 				for(int i = 0; i < numIterations; i++) {
 					Chat chat = manager.newChat("chat"+i, 5, TimeUnit.SECONDS);
 					chat.addUser(user);
-					System.out.println("Users in chat: "+chat.getUsers());
+					System.out.println("Users in chat: ");
+					for(User u: chat.getUsers()) {
+						System.out.print(u.getName()+" ");
+					}
+					System.out.println();
 				}
 
 				return true;

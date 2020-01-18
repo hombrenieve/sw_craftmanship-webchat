@@ -2,9 +2,9 @@ package es.codeurjc.webchat;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Chat {
 
@@ -23,7 +23,7 @@ public class Chat {
 	}
 
 	public void addUser(User user) {
-		users.put(user.getName(), user);
+		users.put(user.getName(), new QueuedUser(user));
 		for(User u : users.values()){
 			if (u != user) {
 				u.newUserInChat(this, user);
