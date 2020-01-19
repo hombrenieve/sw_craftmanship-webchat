@@ -6,7 +6,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
+import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
 
@@ -121,7 +123,7 @@ public class ChatManagerTest {
 	public void notificationsInParallel() throws InterruptedException, TimeoutException {
 		final int numUsers = 4;
 		final String chatName = "TestChat";
-		ChatManager manager = new ChatManager(50);
+		ChatManager manager = new ChatManager(2);
 		CountDownLatch cl = new CountDownLatch(numUsers-1);
 		CountDownLatch clFinish = new CountDownLatch(1);
 
@@ -173,13 +175,67 @@ public class ChatManagerTest {
 			catch (ExecutionException ee) {
 				throw new ConcurrentModificationException(ee.getCause());
 			}
-			catch (InterruptedException ie) {
-				System.err.println("Another error has happened");
-			}
 		}
 
 		System.out.println("The time spent since the send and all received was "+elapsed.getSeconds()+"s "+elapsed.getNano()+"ns");
 
-		assertTrue("Too much duration, is it sequential? ", elapsed.getSeconds() < (numUsers-1));
+		assertTrue("Too long duration, is it sequential? ", elapsed.getSeconds() < (numUsers-1));
+	}
+
+	@Test
+	public void messageOrder() throws TimeoutException, InterruptedException {
+		final String chatName = "OrderTestChat";
+		final int numMessages = 5;
+		ChatManager manager = new ChatManager(2);
+		CountDownLatch cl = new CountDownLatch(numMessages);
+
+		Callable<List<String>> receiverActions = () -> {
+			List<String> messages = new ArrayList<>();
+			TestUser user = new TestUser("receiver") {
+				@Override
+				public void newMessage(Chat chat, User user, String message) {
+					System.out.println("New message '" + message + "' from user " + user.getName()
+							+ " in chat " + chat.getName());
+					System.out.println("Slowing down a bit");
+					try {
+						Thread.sleep(500);
+					} catch (InterruptedException e) {
+						System.out.println("Error sleeping!!");
+					}
+					messages.add(message);
+					cl.countDown();
+				}
+			};
+			manager.newUser(user);
+			Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+			chat.addUser(user);
+			cl.await();
+			return messages;
+		};
+
+		ExecutorService executor = Executors.newFixedThreadPool(1);
+		CompletionService<List<String>> service = new ExecutorCompletionService<>(executor);
+
+		service.submit(receiverActions);
+
+		//Now the sender actions
+		TestUser user = new TestUser("sender");
+		manager.newUser(user);
+		Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+		chat.addUser(user);
+		for (int i = 1; i <= numMessages; i++) {
+			chat.sendMessage(user, Integer.toString(i));
+		}
+
+		try {
+			Future<List<String>> f = service.take();
+			//Assert the list is in correct order
+			List<String> receivedMessages = f.get();
+			for (int i = 1; i <= numMessages; i++) {
+				assertTrue("Messsage in wrong order", Integer.parseInt(receivedMessages.get(i-1)) == i);
+			}
+		} catch (ExecutionException ee) {
+			throw new ConcurrentModificationException(ee.getCause());
+		}
 	}
 }
