@@ -121,14 +121,15 @@ public class ChatManagerTest {
 
 	@Test
 	public void notificationsInParallel() throws InterruptedException, TimeoutException {
-		final int numUsers = 4;
+		final int numReceivers = 3;
 		final String chatName = "TestChat";
 		ChatManager manager = new ChatManager(2);
-		CountDownLatch cl = new CountDownLatch(numUsers-1);
+		CountDownLatch clStart = new CountDownLatch(numReceivers);
+		CountDownLatch cl = new CountDownLatch(numReceivers);
 		CountDownLatch clFinish = new CountDownLatch(1);
 
 		Callable<Boolean> receiverActions = () -> {
-			TestUser user = new TestUser("user "+Thread.currentThread().getName()) {
+			TestUser user = new TestUser("user_"+Thread.currentThread().getName()) {
 				@Override
 				public void newMessage(Chat chat, User user, String message) {
 					System.out.println("New message '" + message + "' from user " + user.getName()
@@ -137,7 +138,7 @@ public class ChatManagerTest {
 					try {
 						Thread.sleep(1000);
 					} catch (InterruptedException e) {
-						System.out.println("Error sleeeping!!");
+						System.out.println("Error sleeping!!");
 					}
 					cl.countDown();
 				}
@@ -145,29 +146,31 @@ public class ChatManagerTest {
 			manager.newUser(user);
 			Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
 			chat.addUser(user);
+			clStart.countDown();
 			clFinish.await();
 			return true;
 		};
 
-		ExecutorService executor = Executors.newFixedThreadPool(numUsers);
+		ExecutorService executor = Executors.newFixedThreadPool(numReceivers);
 		CompletionService<Boolean> service = new ExecutorCompletionService<>(executor);
 
-		for(int i = 0; i < numUsers-1; i++) {
+		for(int i = 0; i < numReceivers; i++) {
 			service.submit(receiverActions);
 		}
 
-		TestUser user = new TestUser("user"+Thread.currentThread().getName());
+		TestUser user = new TestUser("sender");
 		manager.newUser(user);
 		Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
 		chat.addUser(user);
 		Instant start = Instant.now();
+		clStart.await();
 		chat.sendMessage(user, "The message!");
 		cl.await();
 		clFinish.countDown();
 		Instant end = Instant.now();
 		Duration elapsed = Duration.between(start, end);
 
-		for(int i = 0; i < numUsers-1; i++) {
+		for(int i = 0; i < numReceivers; i++) {
 			try {
 				Future<Boolean> f = service.take();
 				assertTrue("Task failed", f.get().booleanValue());
@@ -179,7 +182,7 @@ public class ChatManagerTest {
 
 		System.out.println("The time spent since the send and all received was "+elapsed.getSeconds()+"s "+elapsed.getNano()+"ns");
 
-		assertTrue("Too long duration, is it sequential? ", elapsed.getSeconds() < (numUsers-1));
+		assertTrue("Too long duration, is it sequential? ", elapsed.getSeconds() < (numReceivers));
 	}
 
 	@Test
@@ -187,10 +190,12 @@ public class ChatManagerTest {
 		final String chatName = "OrderTestChat";
 		final int numMessages = 5;
 		ChatManager manager = new ChatManager(2);
-		CountDownLatch cl = new CountDownLatch(numMessages);
+		CountDownLatch clStart = new CountDownLatch(1);
+
 
 		Callable<List<String>> receiverActions = () -> {
 			List<String> messages = new ArrayList<>();
+			CountDownLatch cl = new CountDownLatch(numMessages);
 			TestUser user = new TestUser("receiver") {
 				@Override
 				public void newMessage(Chat chat, User user, String message) {
@@ -209,6 +214,7 @@ public class ChatManagerTest {
 			manager.newUser(user);
 			Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
 			chat.addUser(user);
+			clStart.countDown();
 			cl.await();
 			return messages;
 		};
@@ -223,6 +229,7 @@ public class ChatManagerTest {
 		manager.newUser(user);
 		Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
 		chat.addUser(user);
+		clStart.await();
 		for (int i = 1; i <= numMessages; i++) {
 			chat.sendMessage(user, Integer.toString(i));
 		}
