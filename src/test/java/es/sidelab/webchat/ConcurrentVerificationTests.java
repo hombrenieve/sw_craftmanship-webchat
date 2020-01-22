@@ -43,18 +43,17 @@ public class ConcurrentVerificationTests {
         final String chatName = "NewChatTest";
 
         Callable<String> receiverActions = () -> {
-            final String[] receivedChatName = new String[1];
-            TestUser user = new TestUser("user-"+Thread.currentThread().getName()) {
+            ConcurrentTestUser user = new ConcurrentTestUser(cl) {
                 @Override
                 public void newChat(Chat chat) {
-                    receivedChatName[0] = chat.getName();
-                    cl.countDown();
+                    this.setData(chat.getName());
+                    this.countDown();
                 }
             };
             manager.newUser(user);
             clStart.countDown();
             clFinish.await();
-            return receivedChatName[0];
+            return user.getData();
         };
 
         Callable<String> senderActions = () -> {
@@ -77,18 +76,17 @@ public class ConcurrentVerificationTests {
         final String chatName = "DeleteChatTest";
 
         Callable<String> receiverActions = () -> {
-            final String[] receivedChatName = new String[1];
-            TestUser user = new TestUser("user-"+Thread.currentThread().getName()) {
+            ConcurrentTestUser user = new ConcurrentTestUser(cl) {
                 @Override
                 public void chatClosed(Chat chat) {
-                    receivedChatName[0] = chat.getName();
-                    cl.countDown();
+                    this.setData(chat.getName());
+                    this.countDown();
                 }
             };
             manager.newUser(user);
             clStart.countDown();
             clFinish.await();
-            return receivedChatName[0];
+            return user.getData();
         };
 
         Callable<String> senderActions = () -> {
@@ -113,12 +111,11 @@ public class ConcurrentVerificationTests {
         final String userName = "VIPUser";
 
         Callable<String> receiverActions = () -> {
-            final String[] receivedUserName = new String[1];
-            TestUser user = new TestUser("user-"+Thread.currentThread().getName()) {
+           ConcurrentTestUser user = new ConcurrentTestUser(cl) {
                 @Override
                 public void newUserInChat(Chat chat, User user) {
-                    receivedUserName[0] = user.getName();
-                    cl.countDown();
+                    this.setData(user.getName());
+                    if(clStart.getCount() == 0) this.countDown();
                 }
             };
             manager.newUser(user);
@@ -126,14 +123,13 @@ public class ConcurrentVerificationTests {
             chat.addUser(user);
             clStart.countDown();
             clFinish.await();
-            return receivedUserName[0];
+            return user.getData();
         };
 
         Callable<String> senderActions = () -> {
             TestUser user = new TestUser(userName);
             manager.newUser(user);
             clStart.await();
-            cl = new CountDownLatch(numUsers);
             Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
             chat.addUser(user);
             cl.await();
@@ -144,5 +140,82 @@ public class ConcurrentVerificationTests {
         this.submit(senderActions, receiverActions);
 
         this.checkTasks("New user in chat is not correct", userName);
+    }
+
+    @Test
+    public void userExitedFromChat() throws InterruptedException {
+        final String chatName = "ExitedUserChatTest";
+        final String userName = "VIPUser";
+
+        Callable<String> receiverActions = () -> {
+            ConcurrentTestUser user = new ConcurrentTestUser(cl) {
+                @Override
+                public void userExitedFromChat(Chat chat, User user) {
+                    this.setData(user.getName());
+                    this.countDown();
+                }
+            };
+            manager.newUser(user);
+            Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            chat.addUser(user);
+            clStart.countDown();
+            clFinish.await();
+            return user.getData();
+        };
+
+        Callable<String> senderActions = () -> {
+            TestUser user = new TestUser(userName);
+            manager.newUser(user);
+            Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            chat.addUser(user);
+            clStart.await();
+            chat.removeUser(user);
+            cl.await();
+            clFinish.countDown();
+            return user.getName();
+        };
+
+        this.submit(senderActions, receiverActions);
+
+        this.checkTasks("Deleted user in chat is not correct", userName);
+    }
+
+    @Test
+    public void newMessageInChat() throws InterruptedException {
+        final String chatName = "NewMessageInChatTest";
+        final String userName = "VIPUser";
+        final String viMessage = "Hello";
+
+        Callable<String> receiverActions = () -> {
+            ConcurrentTestUser user = new ConcurrentTestUser(cl) {
+                @Override
+                public void newMessage(Chat chat, User user, String message) {
+                    this.setData(message);
+                    this.countDown();
+                }
+            };
+            manager.newUser(user);
+            Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            chat.addUser(user);
+            clStart.countDown();
+            clFinish.await();
+            return user.getData();
+        };
+
+        Callable<String> senderActions = () -> {
+            TestUser user = new TestUser(userName);
+            manager.newUser(user);
+            Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            chat.addUser(user);
+            clStart.await();
+            chat.sendMessage(user, viMessage);
+            cl.await();
+            clFinish.countDown();
+            return viMessage;
+        };
+
+        this.submit(senderActions, receiverActions);
+
+        this.checkTasks("Message received in chat is not correct", viMessage);
     }
 }
