@@ -2,6 +2,7 @@ package es.codeurjc.webchat;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -10,9 +11,11 @@ public class ChatManager {
 	private ConcurrentHashMap<String, Chat> chats = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<String, User> users = new ConcurrentHashMap<>();
 	private int maxChats;
+	private Semaphore chatSemaphore;
 
 	public ChatManager(int maxChats) {
 		this.maxChats = maxChats;
+		this.chatSemaphore =  new Semaphore(this.maxChats);
 	}
 
 	public void newUser(User user) {
@@ -27,14 +30,15 @@ public class ChatManager {
 	public Chat newChat(String name, long timeout, TimeUnit unit) throws InterruptedException,
 			TimeoutException {
 
-		if (chats.size() == maxChats) {
-			throw new TimeoutException("There is no enough capacity to create a new chat");
-		}
-
 		Chat newChat = new Chat(this, name);
 		Chat oldChat = chats.putIfAbsent(name, newChat);
 		if(oldChat != null){
 			return oldChat;
+		}
+
+		if (!this.chatSemaphore.tryAcquire(timeout, unit)) {
+			this.chats.remove(name);
+			throw new TimeoutException("There is no enough capacity to create a new chat");
 		}
 
 		for(User user : users.values()){
@@ -49,6 +53,7 @@ public class ChatManager {
 			throw new IllegalArgumentException("Trying to remove an unknown chat with name \'"
 					+ chat.getName() + "\'");
 		}
+		this.chatSemaphore.release();
 
 		for(User user : users.values()){
 			user.chatClosed(chat);

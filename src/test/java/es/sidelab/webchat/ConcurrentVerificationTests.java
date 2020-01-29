@@ -12,12 +12,12 @@ import static org.junit.Assert.assertTrue;
 
 public class ConcurrentVerificationTests {
     final int numUsers = 5;
-    ChatManager manager = new ChatManager(2);
-    CountDownLatch clStart = new CountDownLatch(numUsers);
-    CountDownLatch cl = new CountDownLatch(numUsers);
-    CountDownLatch clFinish = new CountDownLatch(1);
-    ExecutorService executor = Executors.newFixedThreadPool(numUsers+1);
-    CompletionService<String> service = new ExecutorCompletionService<>(executor);
+    private ChatManager manager = new ChatManager(2);
+    private CountDownLatch clStart = new CountDownLatch(numUsers);
+    private CountDownLatch cl = new CountDownLatch(numUsers);
+    private CountDownLatch clFinish = new CountDownLatch(1);
+    private ExecutorService executor = Executors.newFixedThreadPool(numUsers+1);
+    private CompletionService<String> service = new ExecutorCompletionService<>(executor);
 
     private void submit(Callable<String> senderActions, Callable<String> receiverActions) {
         for(int i = 0; i < numUsers; i++) {
