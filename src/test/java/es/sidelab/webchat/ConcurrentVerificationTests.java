@@ -92,8 +92,8 @@ public class ConcurrentVerificationTests {
         Callable<String> senderActions = () -> {
             TestUser user = new TestUser("sender");
             manager.newUser(user);
-            clStart.await();
             Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            clStart.await();
             manager.closeChat(chat);
             cl.await();
             clFinish.countDown();
