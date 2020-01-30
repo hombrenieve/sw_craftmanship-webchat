@@ -82,4 +82,67 @@ public class ChatCreationTimeoutTests {
         Duration elapsed = Duration.between(start, end);
         assertTrue("Execution time too short", elapsed.compareTo(Duration.ofMillis(timeout)) >= 0);
     }
+
+    @Test
+    public void chatCreationAlmostTimesOut() throws InterruptedException, ConcurrentModificationException, TimeoutException {
+        final int numChats = 10;
+        final String chatPrefix = "ChatAlmostTimeout";
+        final long timeout = 500; //milliseconds
+        final long sleep = 300;
+        ChatManager manager = new ChatManager(numChats);
+        CountDownLatch clStart = new CountDownLatch(numChats);
+
+        Callable<ExecutionResult> creatorActions = () -> {
+            Instant start = Instant.now();
+            Chat chat = manager.newChat(chatPrefix+Thread.currentThread().getName(), timeout, TimeUnit.MILLISECONDS);
+            Instant end = Instant.now();
+            Duration elapsed = Duration.between(start, end);
+            clStart.countDown();
+            return new ExecutionResult(elapsed, chat);
+        };
+
+        Callable<ExecutionResult> releaserActions = () -> {
+            Instant start = Instant.now();
+            Chat chat = manager.newChat(chatPrefix+Thread.currentThread().getName(), timeout, TimeUnit.MILLISECONDS);
+            Instant end = Instant.now();
+            Duration elapsed = Duration.between(start, end);
+            clStart.countDown();
+            Thread.sleep(sleep);
+            manager.closeChat(chat);
+            return new ExecutionResult(elapsed, chat);
+        };
+
+        ExecutorService executor = Executors.newFixedThreadPool(numChats+1);
+        CompletionService<ExecutionResult> service = new ExecutorCompletionService<>(executor);
+
+        for(int i = 0; i < numChats-1; i++) {
+            service.submit(creatorActions);
+        }
+        service.submit(releaserActions);
+
+        try {
+            clStart.await();
+            ExecutionResult resultOfTimeout = creatorActions.call();
+            assertTrue("Chat was not created", resultOfTimeout.getChat() != null);
+            assertTrue("Execution time too short", resultOfTimeout.getElapsed().compareTo(Duration.ofMillis(sleep)) >= 0);
+            assertTrue("Execution time too long", resultOfTimeout.getElapsed().compareTo(Duration.ofMillis(timeout)) < 0);
+        }
+        catch(TimeoutException te) {
+            throw te;
+        }
+        catch(Exception e) {
+            assertTrue("Unhandled exception", false);
+        }
+
+        for(int i = 0; i < numChats; i++) {
+            try {
+                Future<ExecutionResult> f = service.take();
+                assertTrue("Chat can't be created", f.get().getChat() != null);
+                assertTrue("Execution time too long", f.get().getElapsed().compareTo(Duration.ofMillis(timeout)) < 0);
+            }
+            catch (ExecutionException ee) {
+                throw new ConcurrentModificationException(ee.getCause());
+            }
+        }
+    }
 }
