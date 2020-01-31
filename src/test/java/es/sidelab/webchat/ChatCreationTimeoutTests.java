@@ -2,7 +2,6 @@ package es.sidelab.webchat;
 
 import es.codeurjc.webchat.Chat;
 import es.codeurjc.webchat.ChatManager;
-import es.codeurjc.webchat.User;
 import org.junit.Test;
 
 import java.time.Duration;
@@ -10,7 +9,6 @@ import java.time.Instant;
 import java.util.ConcurrentModificationException;
 import java.util.concurrent.*;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ChatCreationTimeoutTests {

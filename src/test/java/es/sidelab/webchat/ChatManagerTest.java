@@ -41,9 +41,9 @@ public class ChatManagerTest {
 				+ chatName[0], Objects.equals(chatName[0], "Chat"));
 	}
 
-	@Ignore("It is not reliable in an asynchronous world")
 	@Test
 	public void newUserInChat() throws InterruptedException, TimeoutException {
+		CountDownLatch clNotified = new CountDownLatch(1);
 
 		ChatManager chatManager = new ChatManager(5);
 
@@ -53,6 +53,7 @@ public class ChatManagerTest {
 			@Override
 			public void newUserInChat(Chat chat, User user) {
 				newUser[0] = user.getName();
+				clNotified.countDown();
 			}
 		};
 
@@ -65,6 +66,8 @@ public class ChatManagerTest {
 
 		chat.addUser(user1);
 		chat.addUser(user2);
+
+		clNotified.await();
 
 		assertTrue("Notified new user '" + newUser[0] + "' is not equal than user name 'user2'",
 				"user2".equals(newUser[0]));
