@@ -17,6 +17,10 @@ import static org.junit.Assert.assertTrue;
 
 public class ConcurrentTest {
 
+    private static int getIdentifier() {
+        return (int) Thread.currentThread().getId();
+    }
+
     @Test
     public void concurrentUsersInChat() {
         final int numUsers = 4;
@@ -24,13 +28,13 @@ public class ConcurrentTest {
         final ChatManager manager = new ChatManager(50);
 
         Callable<Boolean> concurrentUserActions = () -> {
-            TestUser user = new TestUser("user-"+Thread.currentThread().getName());
+            TestUser user = new TestUser("user-"+ConcurrentTest.getIdentifier());
             manager.newUser(user);
 
             for(int i = 0; i < numIterations; i++) {
                 Chat chat = manager.newChat("chat"+i, 5, TimeUnit.SECONDS);
                 chat.addUser(user);
-                System.out.println("Users in chat: "+chat.getUsers().stream().map(User::getName).collect(Collectors.toList()));
+                System.out.println(user+" users in "+ chat.getName() +": "+chat.getUsers().stream().map(User::getName).collect(Collectors.toList()));
             }
 
             return true;
@@ -67,7 +71,7 @@ public class ConcurrentTest {
         CountDownLatch clFinish = new CountDownLatch(1);
 
         Callable<Boolean> receiverActions = () -> {
-            TestUser user = new TestUser("user-"+Thread.currentThread().getName()) {
+            TestUser user = new TestUser("user-"+ConcurrentTest.getIdentifier()) {
                 @Override
                 public void newMessage(Chat chat, User user, String message) {
                     System.out.println("New message '" + message + "' from user " + user.getName()
@@ -137,9 +141,8 @@ public class ConcurrentTest {
             TestUser user = new TestUser("receiver") {
                 @Override
                 public void newMessage(Chat chat, User user, String message) {
-                    System.out.println("New message '" + message + "' from user " + user.getName()
+                    System.out.println("Receiver: '" + message + "' from user " + user.getName()
                             + " in chat " + chat.getName());
-                    System.out.println("Slowing down a bit");
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException e) {

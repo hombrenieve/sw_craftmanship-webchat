@@ -36,9 +36,15 @@ public class ChatManager {
 			return oldChat;
 		}
 
-		if (!this.chatSemaphore.tryAcquire(timeout, unit)) {
+		try {
+			if (!this.chatSemaphore.tryAcquire(timeout, unit)) {
+				this.chats.remove(name);
+				throw new TimeoutException("There is no enough capacity to create a new chat");
+			}
+		}
+		catch(InterruptedException ie) {
 			this.chats.remove(name);
-			throw new TimeoutException("There is no enough capacity to create a new chat");
+			throw ie;
 		}
 
 		for(User user : users.values()){
