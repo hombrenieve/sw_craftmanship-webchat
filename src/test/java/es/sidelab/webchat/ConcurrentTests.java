@@ -22,7 +22,7 @@ public class ConcurrentTests {
     }
 
     @Test
-    public void concurrentUsersInChat() {
+    public void concurrentUsersInChat() throws ConcurrentModificationException {
         final int numUsers = 4;
         final int numIterations = 5;
         final ChatManager manager = new ChatManager(50);
@@ -62,7 +62,7 @@ public class ConcurrentTests {
     }
 
     @Test
-    public void notificationsInParallel() throws InterruptedException, TimeoutException {
+    public void notificationsInParallel() throws Exception {
         final int numReceivers = 3;
         final String chatName = "TestChat";
         ChatManager manager = new ChatManager(2);
@@ -112,13 +112,8 @@ public class ConcurrentTests {
         Duration elapsed = Duration.between(start, end);
 
         for(int i = 0; i < numReceivers; i++) {
-            try {
-                Future<Boolean> f = service.take();
-                assertTrue("Task failed", f.get().booleanValue());
-            }
-            catch (ExecutionException ee) {
-                throw new ConcurrentModificationException(ee.getCause());
-            }
+            Future<Boolean> f = service.take();
+            assertTrue("Task failed", f.get().booleanValue());
         }
 
         System.out.println("The time spent since the send and all received was "+elapsed.getSeconds()+"s "+elapsed.getNano()+"ns");
@@ -127,7 +122,7 @@ public class ConcurrentTests {
     }
 
     @Test
-    public void messageOrder() throws TimeoutException, InterruptedException {
+    public void messageOrder() throws Exception {
         final String chatName = "OrderTestChat";
         final int numMessages = 5;
         ChatManager manager = new ChatManager(2);
@@ -174,15 +169,11 @@ public class ConcurrentTests {
             chat.sendMessage(user, Integer.toString(i));
         }
 
-        try {
-            Future<List<String>> f = service.take();
-            //Assert the list is in correct order
-            List<String> receivedMessages = f.get();
-            for (int i = 1; i <= numMessages; i++) {
-                assertTrue("Messsage in wrong order", Integer.parseInt(receivedMessages.get(i-1)) == i);
-            }
-        } catch (ExecutionException ee) {
-            throw new ConcurrentModificationException(ee.getCause());
+        Future<List<String>> f = service.take();
+        //Assert the list is in correct order
+        List<String> receivedMessages = f.get();
+        for (int i = 1; i <= numMessages; i++) {
+            assertTrue("Messsage in wrong order", Integer.parseInt(receivedMessages.get(i-1)) == i);
         }
     }
 }
