@@ -32,9 +32,11 @@ public class Chat {
 	}
 
 	public void removeUser(User user) {
-		users.remove(user.getName());
-		for(User u : users.values()){
-			u.userExitedFromChat(this, user);
+		User oldUser = users.remove(user.getName());
+		if(oldUser != null) {
+			for (User u : users.values()) {
+				u.userExitedFromChat(this, user);
+			}
 		}
 	}
 
