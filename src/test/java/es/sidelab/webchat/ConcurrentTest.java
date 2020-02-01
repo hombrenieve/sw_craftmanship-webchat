@@ -76,7 +76,6 @@ public class ConcurrentTest {
                 public void newMessage(Chat chat, User user, String message) {
                     System.out.println("New message '" + message + "' from user " + user.getName()
                             + " in chat " + chat.getName());
-                    System.out.println("Slowing down a bit");
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {

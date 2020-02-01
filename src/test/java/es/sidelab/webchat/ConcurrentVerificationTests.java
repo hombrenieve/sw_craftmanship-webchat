@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import java.util.ConcurrentModificationException;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertTrue;
 
@@ -31,7 +32,7 @@ public class ConcurrentVerificationTests {
             for(int i = 0; i < numUsers; i++) {
                 Future<String> f = service.take();
                 String received = f.get();
-                assertTrue(assertMsg, received.equals(expected));
+                assertTrue(assertMsg+": "+received, received.equals(expected));
             }
         } catch (ExecutionException ee) {
             throw new ConcurrentModificationException(ee.getCause());
@@ -109,13 +110,16 @@ public class ConcurrentVerificationTests {
     public void newUserInChat() throws InterruptedException {
         final String chatName = "NewUserChatTest";
         final String userName = "VIPUser";
+        AtomicBoolean userAdded = new AtomicBoolean(false);
 
         Callable<String> receiverActions = () -> {
            ConcurrentTestUser user = new ConcurrentTestUser(cl) {
                 @Override
                 public void newUserInChat(Chat chat, User user) {
-                    this.setData(user.getName());
-                    if(clStart.getCount() == 0) this.countDown();
+                    if(userAdded.get()) {
+                        this.setData(user.getName());
+                        this.countDown();
+                    }
                 }
             };
             manager.newUser(user);
@@ -131,6 +135,7 @@ public class ConcurrentVerificationTests {
             manager.newUser(user);
             clStart.await();
             Chat chat = manager.newChat(chatName, 5, TimeUnit.SECONDS);
+            userAdded.set(true);
             chat.addUser(user);
             cl.await();
             clFinish.countDown();
