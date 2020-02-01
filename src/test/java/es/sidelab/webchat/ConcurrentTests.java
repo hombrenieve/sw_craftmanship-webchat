@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertTrue;
 
-public class ConcurrentTest {
+public class ConcurrentTests {
 
     private static int getIdentifier() {
         return (int) Thread.currentThread().getId();
@@ -28,7 +28,7 @@ public class ConcurrentTest {
         final ChatManager manager = new ChatManager(50);
 
         Callable<Boolean> concurrentUserActions = () -> {
-            TestUser user = new TestUser("user-"+ConcurrentTest.getIdentifier());
+            TestUser user = new TestUser("user-"+ ConcurrentTests.getIdentifier());
             manager.newUser(user);
 
             for(int i = 0; i < numIterations; i++) {
@@ -71,7 +71,7 @@ public class ConcurrentTest {
         CountDownLatch clFinish = new CountDownLatch(1);
 
         Callable<Boolean> receiverActions = () -> {
-            TestUser user = new TestUser("user-"+ConcurrentTest.getIdentifier()) {
+            TestUser user = new TestUser("user-"+ ConcurrentTests.getIdentifier()) {
                 @Override
                 public void newMessage(Chat chat, User user, String message) {
                     System.out.println("New message '" + message + "' from user " + user.getName()
